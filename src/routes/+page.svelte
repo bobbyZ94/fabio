@@ -3,28 +3,126 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { getImageUrl } from '$lib/directus';
+	import { optimizeContent } from '$lib/contentUtils';
 	import type { PageData } from './$types';
+
+	// Type definitions
+	interface Point {
+		type: 'Point';
+		coordinates: [number, number];
+	}
+
+	interface Place {
+		id: number;
+		status: string;
+		name: string;
+		date: string;
+		thumbnail: string;
+		story: string;
+		point: Point;
+	}
+
+	interface PixelPosition {
+		x: number;
+		y: number;
+	}
+
+	interface PlaceWithPosition {
+		place: Place;
+		coords: [number, number];
+		pixel: PixelPosition;
+	}
 
 	let { data }: { data: PageData } = $props();
 
-	const MAP_MAX_ZOOM = 18;
-	const THUMBNAIL_ZOOM = 16;
+	// Centralized map configuration
+	const MAP_CONFIG = {
+		center: [10.5, 51.0] as [number, number], // Germany
+		zoom: 4,
+		maxZoom: 18,
+		minZoom: 2,
+		thumbnailZoom: 16,
+		style: 'https://demotiles.maplibre.org/style.json',
+		osmTiles: [
+			'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+		],
+		osmAttribution: '© OpenStreetMap contributors',
+		clustering: {
+			overlapThreshold: 100, // pixels
+			viewportPadding: 1.0, // multiplier for extended bounds
+			zoomIncrement: 2.5 // zoom increase when clicking cluster
+		}
+	};
+
+	// Marker style constants
+	const MARKER_STYLES = {
+		cluster: {
+			width: '40px',
+			height: '40px',
+			borderRadius: '50%',
+			background: '#d00',
+			border: '2px solid white',
+			boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'center',
+			color: 'white',
+			fontWeight: '600',
+			fontSize: '12px',
+			cursor: 'pointer'
+		},
+		thumbnail: {
+			width: '100px',
+			height: '100px',
+			borderRadius: '50%',
+			overflow: 'hidden',
+			boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
+			border: '2px solid white',
+			backgroundColor: '#ddd',
+			cursor: 'pointer'
+		},
+		thumbnailImage: {
+			width: '100%',
+			height: '100%',
+			objectFit: 'cover'
+		},
+		thumbnailTitle: {
+			background: '#ffffff',
+			color: '#000000',
+			fontSize: '11px',
+			fontWeight: '600',
+			padding: '4px 6px',
+			boxSizing: 'border-box',
+			textAlign: 'center',
+			maxWidth: '120px',
+			borderRadius: '6px',
+			transform: 'translateY(-25px)',
+			margin: '10px'
+		},
+		wrapper: {
+			display: 'flex',
+			flexDirection: 'column',
+			alignItems: 'center'
+		}
+	};
+
 	let mapContainer: HTMLDivElement;
 	let map: maplibregl.Map;
-	let selectedPlace: any = $state(null);
+	let selectedPlace: Place | null = $state(null);
+	let showIntroModal: boolean = $state(false);
 	let markers: maplibregl.Marker[] = [];
-	let placeById: Record<string, any> = {};
+	let placeById: Record<number, Place> = {};
 
 	onMount(() => {
 		map = new maplibregl.Map({
 			container: mapContainer,
-			// Robust vector base style
-			style: 'https://demotiles.maplibre.org/style.json',
-			center: [10.5, 51.0], // Germany
-			zoom: 4,
-			maxZoom: MAP_MAX_ZOOM,
-			minZoom: 2,
-			// Disable default attribution to avoid duplicates; we'll use a single compact control
+			style: MAP_CONFIG.style,
+			center: MAP_CONFIG.center,
+			zoom: MAP_CONFIG.zoom,
+			maxZoom: MAP_CONFIG.maxZoom,
+			minZoom: MAP_CONFIG.minZoom,
 			attributionControl: false
 		});
 
@@ -38,13 +136,9 @@
 			if (!map.getSource('osmde')) {
 				map.addSource('osmde', {
 					type: 'raster',
-					tiles: [
-						'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-						'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-						'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-					],
+					tiles: MAP_CONFIG.osmTiles,
 					tileSize: 256,
-					attribution: '© OpenStreetMap contributors',
+					attribution: MAP_CONFIG.osmAttribution,
 					minzoom: 0,
 					maxzoom: 19
 				});
@@ -53,15 +147,15 @@
 
 			// Index places by id for quick lookup
 			if (data.places) {
-				data.places.forEach((p: any) => {
+				data.places.forEach((p) => {
 					if (p?.id) placeById[p.id] = p;
 				});
 			}
 
 			// Build clustered source of places
 			const features = (data.places || [])
-				.filter((p: any) => p?.point?.coordinates)
-				.map((p: any) => ({
+				.filter((p): p is Place => p?.point?.coordinates !== undefined)
+				.map((p) => ({
 					type: 'Feature' as const,
 					geometry: {
 						type: 'Point' as const,
@@ -85,13 +179,8 @@
 		});
 
 		// Log map errors to help diagnose tile/style issues
-		map.on('error', (e: any) => {
-			console.error('MapLibre error:', e?.error || e);
-		});
-
-		// Log current zoom level
-		map.on('zoom', () => {
-			console.log('Current zoom level:', map.getZoom().toFixed(2));
+		map.on('error', (e: maplibregl.ErrorEvent) => {
+			console.error('MapLibre error:', e.error);
 		});
 
 		return () => {
@@ -101,65 +190,66 @@
 
 	function zoomToThumbnail(coords: [number, number], onComplete?: () => void) {
 		if (!map) return;
-		const zoomTarget = Math.min(map.getMaxZoom(), THUMBNAIL_ZOOM);
-		console.log('Zooming to thumbnail:', { coords, currentZoom: map.getZoom(), targetZoom: zoomTarget });
-		map.flyTo({ center: coords, zoom: zoomTarget, duration: 2500, essential: true });
+		const zoomTarget = Math.min(map.getMaxZoom(), MAP_CONFIG.thumbnailZoom);
+		map.flyTo({ center: coords, zoom: zoomTarget, duration: 2000, essential: true });
 		if (onComplete) {
 			map.once('moveend', onComplete);
 		}
 	}
 
-
-	function updateMarkers() {
-		// Remove existing card markers
-		markers.forEach((m) => m.remove());
-		markers = [];
-
-		// Get places within extended viewport for accurate clustering
+	function getVisiblePlaces(): PlaceWithPosition[] {
 		const bounds = map.getBounds();
 		const sw = bounds.getSouthWest();
 		const ne = bounds.getNorthEast();
 		
-		// Extend bounds significantly for edge cases
-		const lngPadding = (ne.lng - sw.lng) * 1;
-		const latPadding = (ne.lat - sw.lat) * 1;
+		// Extend bounds for edge cases
+		const lngPadding = (ne.lng - sw.lng) * MAP_CONFIG.clustering.viewportPadding;
+		const latPadding = (ne.lat - sw.lat) * MAP_CONFIG.clustering.viewportPadding;
 		
-		const nearbyPlaces = Object.values(placeById).filter((place: any) => {
+		const nearbyPlaces = Object.values(placeById).filter((place): place is Place => {
 			if (!place?.point?.coordinates) return false;
 			const [lng, lat] = place.point.coordinates;
 			return lng >= sw.lng - lngPadding && lng <= ne.lng + lngPadding &&
 			       lat >= sw.lat - latPadding && lat <= ne.lat + latPadding;
 		});
 
-		if (nearbyPlaces.length === 0) return;
-
-		// Calculate pixel positions only for nearby places (for accurate clustering)
-		const places = nearbyPlaces.map((place: any) => {
-			const coords = place.point.coordinates as [number, number];
+		// Calculate pixel positions for clustering
+		return nearbyPlaces.map((place) => {
+			const coords = place.point.coordinates;
 			const pixel = map.project(coords);
 			return { place, coords, pixel };
 		});
+	}
 
-		// Group overlapping thumbnails
-		const OVERLAP_THRESHOLD = 100; // pixels - thumbnail width + margin
-		const groups: Array<Array<typeof places[0]>> = [];
+	/**
+	 * Pure function: Groups items by proximity in 2D pixel space.
+	 * Uses a simple greedy clustering algorithm.
+	 * @param items Array of items with pixel coordinates
+	 * @param threshold Distance threshold for grouping
+	 * @returns Array of groups, where each group contains clustered items
+	 */
+	function clusterByProximity<T extends { pixel: { x: number; y: number } }>(
+		items: T[],
+		threshold: number
+	): T[][] {
+		const groups: T[][] = [];
 		const grouped = new Set<number>();
 
-		for (let i = 0; i < places.length; i++) {
+		for (let i = 0; i < items.length; i++) {
 			if (grouped.has(i)) continue;
 
-			const group = [places[i]];
+			const group = [items[i]];
 			grouped.add(i);
 
-			for (let j = i + 1; j < places.length; j++) {
+			for (let j = i + 1; j < items.length; j++) {
 				if (grouped.has(j)) continue;
 
-				const dx = places[i].pixel.x - places[j].pixel.x;
-				const dy = places[i].pixel.y - places[j].pixel.y;
+				const dx = items[i].pixel.x - items[j].pixel.x;
+				const dy = items[i].pixel.y - items[j].pixel.y;
 				const distance = Math.sqrt(dx * dx + dy * dy);
 
-				if (distance < OVERLAP_THRESHOLD) {
-					group.push(places[j]);
+				if (distance < threshold) {
+					group.push(items[j]);
 					grouped.add(j);
 				}
 			}
@@ -167,7 +257,14 @@
 			groups.push(group);
 		}
 
-		// Render markers: single thumbnails or clustered count markers
+		return groups;
+	}
+
+	function clusterPlaces(places: PlaceWithPosition[]): PlaceWithPosition[][] {
+		return clusterByProximity(places, MAP_CONFIG.clustering.overlapThreshold);
+	}
+
+	function renderMarkers(groups: PlaceWithPosition[][]) {
 		for (const group of groups) {
 			if (group.length === 1) {
 				// Single thumbnail
@@ -186,78 +283,103 @@
 		}
 	}
 
-	function createCountMarker(count: number, places: any[], centerCoords: [number, number]) {
-		const el = document.createElement('div');
-		el.className = 'thumbnail-cluster';
-		el.style.width = '40px';
-		el.style.height = '40px';
-		el.style.borderRadius = '50%';
-		el.style.background = '#d00';
-		el.style.border = '2px solid white';
-		el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-		el.style.display = 'flex';
-		el.style.alignItems = 'center';
-		el.style.justifyContent = 'center';
-		el.style.color = 'white';
-		el.style.fontWeight = '600';
-		el.style.fontSize = '12px';
-		el.style.cursor = 'pointer';
-		el.textContent = count.toString();
+	function updateMarkers() {
+		// Remove existing markers
+		markers.forEach((m) => m.remove());
+		markers = [];
+
+		// Get places within viewport
+		const places = getVisiblePlaces();
+		if (places.length === 0) return;
+
+		// Group overlapping places
+		const groups = clusterPlaces(places);
+
+		// Render markers for each group
+		renderMarkers(groups);
+	}
+
+	/**
+	 * Helper function to create DOM elements with styles and attributes.
+	 * Reduces repetitive DOM manipulation code.
+	 */
+	function createElement<K extends keyof HTMLElementTagNameMap>(
+		tag: K,
+		options: {
+			className?: string;
+			styles?: Partial<CSSStyleDeclaration>;
+			attributes?: Record<string, string>;
+			textContent?: string;
+		} = {}
+	): HTMLElementTagNameMap[K] {
+		const element = document.createElement(tag);
+		
+		if (options.className) {
+			element.className = options.className;
+		}
+		
+		if (options.styles) {
+			Object.assign(element.style, options.styles);
+		}
+		
+		if (options.attributes) {
+			Object.entries(options.attributes).forEach(([key, value]) => {
+				element.setAttribute(key, value);
+			});
+		}
+		
+		if (options.textContent) {
+			element.textContent = options.textContent;
+		}
+		
+		return element;
+	}
+
+	function createCountMarker(count: number, places: Place[], centerCoords: [number, number]) {
+		const el = createElement('div', {
+			className: 'thumbnail-cluster',
+			styles: MARKER_STYLES.cluster,
+			textContent: count.toString()
+		});
 
 		el.addEventListener('click', (e) => {
 			e.stopPropagation();
 			// Zoom in enough to separate the thumbnails (reduce cluster count by at least 1)
 			const currentZoom = map.getZoom();
-			// Increase zoom by 2.5 to ensure cluster splits
-			map.flyTo({ center: centerCoords, zoom: currentZoom + 2.5, duration: 1000, essential: true });
+			map.flyTo({ center: centerCoords, zoom: currentZoom + MAP_CONFIG.clustering.zoomIncrement, duration: 2000, essential: true });
 		});
 
 		return new maplibregl.Marker({ element: el, anchor: 'center' });
 	}
 
-	function createDOMMarker(place: any) {
+	function createDOMMarker(place: Place) {
 		// Wrapper container for marker + title
-		const wrapper = document.createElement('div');
-		wrapper.className = 'marker-wrapper';
-		wrapper.style.display = 'flex';
-		wrapper.style.flexDirection = 'column';
-		wrapper.style.alignItems = 'center';
+		const wrapper = createElement('div', {
+			className: 'marker-wrapper',
+			styles: MARKER_STYLES.wrapper
+		});
 
 		// Circular thumbnail
-		const el = document.createElement('div');
-		el.className = 'marker-thumbnail';
-		el.style.width = '100px';
-		el.style.height = '100px';
-		el.style.borderRadius = '50%';
-		el.style.overflow = 'hidden';
-		el.style.boxShadow = '0 3px 8px rgba(0,0,0,0.3)';
-		el.style.border = '2px solid white';
-		el.style.backgroundColor = '#ddd';
-		el.style.cursor = 'pointer';
+		const el = createElement('div', {
+			className: 'marker-thumbnail',
+			styles: MARKER_STYLES.thumbnail
+		});
 
-		const img = document.createElement('img');
-		img.src = getImageUrl(place.thumbnail, 'map-thumb');
-		img.alt = place.name;
-		img.style.width = '100%';
-		img.style.height = '100%';
-		img.style.objectFit = 'cover';
+		const img = createElement('img', {
+			styles: MARKER_STYLES.thumbnailImage,
+			attributes: {
+				src: getImageUrl(place.thumbnail, 'map-thumb'),
+				alt: place.name
+			}
+		});
 		el.appendChild(img);
 
 		// Title overlapping bottom quarter
-		const title = document.createElement('div');
-		title.className = 'marker-thumb-title';
-		title.textContent = place.name;
-		title.style.background = '#ffffff';
-		title.style.color = '#000000';
-		title.style.fontSize = '11px';
-		title.style.fontWeight = '600';
-		title.style.padding = '4px 6px';
-		title.style.boxSizing = 'border-box';
-		title.style.textAlign = 'center';
-		title.style.maxWidth = '120px';
-		title.style.borderRadius = '6px';
-		title.style.transform = 'translateY(-25px)';
-		title.style.margin = '10px';
+		const title = createElement('div', {
+			className: 'marker-thumb-title',
+			styles: MARKER_STYLES.thumbnailTitle,
+			textContent: place.name
+		});
 
 		wrapper.appendChild(el);
 		wrapper.appendChild(title);
@@ -265,9 +387,9 @@
 		wrapper.addEventListener('click', (e) => {
 			e.stopPropagation();
 			const currentZoom = map.getZoom();
-			const coords = place?.point?.coordinates as [number, number] | undefined;
+			const coords = place.point.coordinates;
 			
-			if (coords && currentZoom < THUMBNAIL_ZOOM - 0.5) {
+			if (coords && currentZoom < MAP_CONFIG.thumbnailZoom - 0.5) {
 				// If not zoomed in enough, zoom first then open modal
 				zoomToThumbnail(coords, () => {
 					selectedPlace = place;
@@ -285,42 +407,12 @@
 		selectedPlace = null;
 	}
 
-	function optimizeContent(html: string) {
-		if (!html) return '';
-		return html.replace(/src="([^"]+)"/g, (match, url) => {
-			if (url.includes('/assets/')) {
-				try {
-					// Handle encoded ampersands in HTML
-					const cleanUrl = url.replace(/&amp;/g, '&');
-					
-					// Parse URL (handle relative paths by providing a dummy base)
-					const isAbsolute = cleanUrl.startsWith('http') || cleanUrl.startsWith('//');
-					const base = 'http://dummy-base.com';
-					const urlObj = new URL(cleanUrl, base);
+	function openIntroModal() {
+		showIntroModal = true;
+	}
 
-					// Remove conflicting Directus parameters
-					urlObj.searchParams.delete('key');   // Presets conflict with custom transforms
-					urlObj.searchParams.delete('width'); // Remove existing width to avoid duplicates
-					urlObj.searchParams.delete('height');
-
-					// Set optimization parameters
-					urlObj.searchParams.set('format', 'webp');
-					urlObj.searchParams.set('width', '800');
-					urlObj.searchParams.set('quality', '100');
-
-					// Reconstruct the URL
-					const finalUrl = isAbsolute 
-						? urlObj.href 
-						: urlObj.pathname + urlObj.search;
-					
-					return `src="${finalUrl}"`;
-				} catch (e) {
-					console.error('Error parsing image URL:', e);
-					return match;
-				}
-			}
-			return match;
-		});
+	function closeIntroModal() {
+		showIntroModal = false;
 	}
 </script>
 
@@ -329,7 +421,10 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 </svelte:head>
 
-<a href="/list" class="list-btn">Listen Ansicht</a>
+<div class="top-buttons">
+	<a href="/list" class="list-btn">Listen Ansicht</a>
+	<button class="intro-btn" onclick={openIntroModal}>?</button>
+</div>
 
 <div class="map-container" bind:this={mapContainer}></div>
 
@@ -352,6 +447,28 @@
 	</div>
 {/if}
 
+{#if showIntroModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-backdrop" onclick={closeIntroModal}>
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<button class="close-btn" onclick={closeIntroModal}>&times;</button>
+			
+			<div class="story-header">
+				<h2>Wer bin ich?</h2>
+			</div>
+			
+			<div class="story-body">
+				{#if data.introduction && !Array.isArray(data.introduction) && data.introduction.text}
+					{@html optimizeContent(data.introduction.text)}
+				{:else}
+					<p>Keine Einführung verfügbar.</p>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style>
 	:global(body) {
 		margin: 0;
@@ -365,23 +482,31 @@
 		height: 100vh;
 	}
 
-	.list-btn {
+	.top-buttons {
 		position: fixed;
 		top: 1rem;
 		left: 1rem;
 		z-index: 10;
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.list-btn, .intro-btn {
 		padding: 0.75rem 1.25rem;
 		background: white;
 		color: #333;
 		text-decoration: none;
+		border: none;
 		border-radius: 4px;
 		font-weight: 600;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 		transition: background 0.2s, transform 0.2s;
 		font-size: 0.95rem;
+		cursor: pointer;
+		font-family: 'Titillium Web', sans-serif;
 	}
 
-	.list-btn:hover {
+	.list-btn:hover, .intro-btn:hover {
 		background: #f5f5f5;
 		transform: translateY(-2px);
 	}
@@ -392,7 +517,7 @@
 		left: 0;
 		width: 100%;
 		height: 100%;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(0, 0, 0, 0.8);
 		display: flex;
 		justify-content: center;
 		align-items: center;

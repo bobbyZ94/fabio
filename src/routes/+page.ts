@@ -18,13 +18,22 @@ export const load: PageLoad = async ({ fetch }) => {
 			})
 		);
 
+		const introduction = await directus.request(
+			readItems('introduction' as any, {
+				fields: ['text'],
+				limit: 1
+			})
+		);
+
 		return {
-			places
+			places,
+			introduction: Array.isArray(introduction) && introduction.length > 0 ? introduction[0] : introduction
 		};
 	} catch (error) {
-		console.error('Error fetching places:', error);
+		console.error('Error fetching data:', error);
 		return {
-			places: []
+			places: [],
+			introduction: null
 		};
 	}
 };

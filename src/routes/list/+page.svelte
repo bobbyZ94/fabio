@@ -45,12 +45,12 @@
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-	<title>Orte - Listen Ansicht</title>
+	<title>Baukulturerbe - Listen Ansicht</title>
 </svelte:head>
 
 <div class="container">
 	<header>
-		<h1>Alle Orte</h1>
+		<h1>Baukulturerbe</h1>
 		<a href="/" class="back-btn">← Zur Karte</a>
 	</header>
 
@@ -187,7 +187,7 @@
 		left: 0;
 		width: 100%;
 		height: 100%;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(0, 0, 0, 0.8);
 		display: flex;
 		justify-content: center;
 		align-items: center;
