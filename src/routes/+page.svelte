@@ -8,7 +8,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const MAP_MAX_ZOOM = 18;
-	const CLUSTER_MAX_ZOOM = 17;
 	const THUMBNAIL_ZOOM = 16;
 	let mapContainer: HTMLDivElement;
 	let map: maplibregl.Map;
@@ -110,53 +109,6 @@
 		}
 	}
 
-	function createMarker(place: any) {
-		const el = document.createElement('div');
-		el.className = 'marker-card';
-		el.style.width = '170px';
-		el.style.height = '110px';
-		el.style.position = 'relative';
-		el.style.borderRadius = '8px';
-		el.style.overflow = 'hidden';
-		el.style.boxShadow = '0 4px 10px rgba(0,0,0,0.25)';
-		el.style.border = '1px solid rgba(0,0,0,0.15)';
-		el.style.cursor = 'pointer';
-
-		// Thumbnail image fills the card
-		const img = document.createElement('img');
-		img.src = getImageUrl(place.thumbnail, 'map-thumb');
-		img.alt = place.name;
-		img.style.width = '100%';
-		img.style.height = '100%';
-		img.style.objectFit = 'cover';
-		el.appendChild(img);
-
-		// Title overlay at the bottom of the card
-		const title = document.createElement('div');
-		title.className = 'marker-title';
-		title.textContent = place.name;
-		title.style.position = 'absolute';
-		title.style.left = '0';
-		title.style.right = '0';
-		title.style.bottom = '0';
-		title.style.padding = '6px 8px';
-		title.style.background = 'linear-gradient( to top, rgba(0,0,0,0.55), rgba(0,0,0,0.15) )';
-		title.style.color = '#fff';
-		title.style.fontSize = '13px';
-		title.style.fontWeight = '600';
-		title.style.textShadow = '0 1px 2px rgba(0,0,0,0.6)';
-		el.appendChild(title);
-
-		// Add click event
-		el.addEventListener('click', (e) => {
-			e.stopPropagation();
-			selectedPlace = place;
-		});
-
-		new maplibregl.Marker({ element: el, anchor: 'center' })
-			.setLngLat(place.point.coordinates)
-			.addTo(map);
-	}
 
 	function updateMarkers() {
 		// Remove existing card markers
@@ -264,6 +216,14 @@
 	}
 
 	function createDOMMarker(place: any) {
+		// Wrapper container for marker + title
+		const wrapper = document.createElement('div');
+		wrapper.className = 'marker-wrapper';
+		wrapper.style.display = 'flex';
+		wrapper.style.flexDirection = 'column';
+		wrapper.style.alignItems = 'center';
+
+		// Circular thumbnail
 		const el = document.createElement('div');
 		el.className = 'marker-thumbnail';
 		el.style.width = '100px';
@@ -283,7 +243,26 @@
 		img.style.objectFit = 'cover';
 		el.appendChild(img);
 
-		el.addEventListener('click', (e) => {
+		// Title overlapping bottom quarter
+		const title = document.createElement('div');
+		title.className = 'marker-thumb-title';
+		title.textContent = place.name;
+		title.style.background = '#ffffff';
+		title.style.color = '#000000';
+		title.style.fontSize = '11px';
+		title.style.fontWeight = '600';
+		title.style.padding = '4px 6px';
+		title.style.boxSizing = 'border-box';
+		title.style.textAlign = 'center';
+		title.style.maxWidth = '120px';
+		title.style.borderRadius = '6px';
+		title.style.transform = 'translateY(-25px)';
+		title.style.margin = '10px';
+
+		wrapper.appendChild(el);
+		wrapper.appendChild(title);
+
+		wrapper.addEventListener('click', (e) => {
 			e.stopPropagation();
 			const currentZoom = map.getZoom();
 			const coords = place?.point?.coordinates as [number, number] | undefined;
@@ -299,7 +278,7 @@
 			}
 		});
 
-		return new maplibregl.Marker({ element: el, anchor: 'center' });
+		return new maplibregl.Marker({ element: wrapper, anchor: 'center' });
 	}
 
 	function closeStory() {
