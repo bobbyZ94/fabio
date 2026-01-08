@@ -14,7 +14,8 @@ export const load: PageLoad = async ({ fetch }) => {
 						_eq: 'published'
 					}
 				},
-				fields: ['*'] // Fetch all fields including thumbnail, story, etc.
+				fields: ['*'],
+				sort: ['-date'] // Sort by date descending (newest first)
 			})
 		);
 

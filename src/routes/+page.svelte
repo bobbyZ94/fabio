@@ -7,6 +7,9 @@
 
 	let { data }: { data: PageData } = $props();
 
+	const MAP_MAX_ZOOM = 18;
+	const CLUSTER_MAX_ZOOM = 17;
+	const THUMBNAIL_ZOOM = 16;
 	let mapContainer: HTMLDivElement;
 	let map: maplibregl.Map;
 	let selectedPlace: any = $state(null);
@@ -18,9 +21,9 @@
 			container: mapContainer,
 			// Robust vector base style
 			style: 'https://demotiles.maplibre.org/style.json',
-			center: [0, 20],
-			zoom: 1.5,
-			maxZoom: 18,
+			center: [10.5, 51.0], // Germany
+			zoom: 4,
+			maxZoom: MAP_MAX_ZOOM,
 			minZoom: 2,
 			// Disable default attribution to avoid duplicates; we'll use a single compact control
 			attributionControl: false
@@ -68,80 +71,15 @@
 					properties: { id: p.id }
 				}));
 
+			// Simple GeoJSON source without clustering - we'll handle it client-side
 			if (!map.getSource('places')) {
 				map.addSource('places', {
 					type: 'geojson',
-					data: ({ type: 'FeatureCollection', features } as any),
-					cluster: true,
-					clusterRadius: 60,
-					clusterMaxZoom: 17
-				});
-
-				// Cluster circles
-				map.addLayer({
-					id: 'clusters',
-					type: 'circle',
-					source: 'places',
-					filter: ['has', 'point_count'],
-					paint: {
-						'circle-color': '#d00',
-						'circle-stroke-color': '#fff',
-						'circle-stroke-width': 2,
-						'circle-radius': [
-							'step',
-							['get', 'point_count'],
-							16,
-							10, 18,
-							25, 22
-						]
-					}
-				});
-
-				// Cluster count labels
-				map.addLayer({
-					id: 'cluster-count',
-					type: 'symbol',
-					source: 'places',
-					filter: ['has', 'point_count'],
-					layout: {
-						'text-field': ['get', 'point_count'],
-						'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-						'text-size': 12
-					},
-					paint: { 'text-color': '#fff' }
-				});
-
-				// Invisible layer for unclustered points (for querying rendered features)
-				map.addLayer({
-					id: 'unclustered',
-					type: 'circle',
-					source: 'places',
-					filter: ['!', ['has', 'point_count']],
-					paint: { 'circle-opacity': 0 }
-				});
-
-				// Zoom into clusters on click
-				map.on('click', 'clusters', (e: any) => {
-					const feats = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
-					const clusterId = feats?.[0]?.properties?.cluster_id;
-					if (clusterId != null) {
-						const source: any = map.getSource('places');
-						source.getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
-							if (err) return;
-							map.easeTo({ center: (feats[0] as any).geometry.coordinates, zoom });
-						});
-					}
-				});
-
-				map.on('mouseenter', 'clusters', () => {
-					map.getCanvas().style.cursor = 'pointer';
-				});
-				map.on('mouseleave', 'clusters', () => {
-					map.getCanvas().style.cursor = '';
+					data: ({ type: 'FeatureCollection', features } as any)
 				});
 			}
 
-			// Render card markers only for unclustered points
+			// Render card markers with custom clustering
 			updateMarkers();
 			map.on('moveend', updateMarkers);
 			map.on('zoomend', updateMarkers);
@@ -152,10 +90,25 @@
 			console.error('MapLibre error:', e?.error || e);
 		});
 
+		// Log current zoom level
+		map.on('zoom', () => {
+			console.log('Current zoom level:', map.getZoom().toFixed(2));
+		});
+
 		return () => {
 			map.remove();
 		};
 	});
+
+	function zoomToThumbnail(coords: [number, number], onComplete?: () => void) {
+		if (!map) return;
+		const zoomTarget = Math.min(map.getMaxZoom(), THUMBNAIL_ZOOM);
+		console.log('Zooming to thumbnail:', { coords, currentZoom: map.getZoom(), targetZoom: zoomTarget });
+		map.flyTo({ center: coords, zoom: zoomTarget, duration: 2500, essential: true });
+		if (onComplete) {
+			map.once('moveend', onComplete);
+		}
+	}
 
 	function createMarker(place: any) {
 		const el = document.createElement('div');
@@ -200,7 +153,7 @@
 			selectedPlace = place;
 		});
 
-		new maplibregl.Marker({ element: el, anchor: 'bottom' })
+		new maplibregl.Marker({ element: el, anchor: 'center' })
 			.setLngLat(place.point.coordinates)
 			.addTo(map);
 	}
@@ -210,32 +163,116 @@
 		markers.forEach((m) => m.remove());
 		markers = [];
 
-		if (!map.getLayer('unclustered')) return;
-		// Query only rendered unclustered features to avoid duplicates
-		const rendered = map.queryRenderedFeatures(undefined, { layers: ['unclustered'] });
-		const seen = new Set<string>();
-		for (const f of rendered as any[]) {
-			const id = f?.properties?.id as string;
-			if (!id || seen.has(id)) continue;
-			seen.add(id);
-			const place = placeById[id];
-			if (!place) continue;
-			const marker = createDOMMarker(place);
-			marker.setLngLat(f.geometry.coordinates).addTo(map);
-			markers.push(marker);
+		// Get places within extended viewport for accurate clustering
+		const bounds = map.getBounds();
+		const sw = bounds.getSouthWest();
+		const ne = bounds.getNorthEast();
+		
+		// Extend bounds significantly for edge cases
+		const lngPadding = (ne.lng - sw.lng) * 1;
+		const latPadding = (ne.lat - sw.lat) * 1;
+		
+		const nearbyPlaces = Object.values(placeById).filter((place: any) => {
+			if (!place?.point?.coordinates) return false;
+			const [lng, lat] = place.point.coordinates;
+			return lng >= sw.lng - lngPadding && lng <= ne.lng + lngPadding &&
+			       lat >= sw.lat - latPadding && lat <= ne.lat + latPadding;
+		});
+
+		if (nearbyPlaces.length === 0) return;
+
+		// Calculate pixel positions only for nearby places (for accurate clustering)
+		const places = nearbyPlaces.map((place: any) => {
+			const coords = place.point.coordinates as [number, number];
+			const pixel = map.project(coords);
+			return { place, coords, pixel };
+		});
+
+		// Group overlapping thumbnails
+		const OVERLAP_THRESHOLD = 100; // pixels - thumbnail width + margin
+		const groups: Array<Array<typeof places[0]>> = [];
+		const grouped = new Set<number>();
+
+		for (let i = 0; i < places.length; i++) {
+			if (grouped.has(i)) continue;
+
+			const group = [places[i]];
+			grouped.add(i);
+
+			for (let j = i + 1; j < places.length; j++) {
+				if (grouped.has(j)) continue;
+
+				const dx = places[i].pixel.x - places[j].pixel.x;
+				const dy = places[i].pixel.y - places[j].pixel.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+
+				if (distance < OVERLAP_THRESHOLD) {
+					group.push(places[j]);
+					grouped.add(j);
+				}
+			}
+
+			groups.push(group);
 		}
+
+		// Render markers: single thumbnails or clustered count markers
+		for (const group of groups) {
+			if (group.length === 1) {
+				// Single thumbnail
+				const marker = createDOMMarker(group[0].place);
+				marker.setLngLat(group[0].coords).addTo(map);
+				markers.push(marker);
+			} else {
+				// Multiple overlapping thumbnails - show count marker at geographic centroid
+				const avgLng = group.reduce((sum, item) => sum + item.coords[0], 0) / group.length;
+				const avgLat = group.reduce((sum, item) => sum + item.coords[1], 0) / group.length;
+				const centerCoords: [number, number] = [avgLng, avgLat];
+				const marker = createCountMarker(group.length, group.map(g => g.place), centerCoords);
+				marker.setLngLat(centerCoords).addTo(map);
+				markers.push(marker);
+			}
+		}
+	}
+
+	function createCountMarker(count: number, places: any[], centerCoords: [number, number]) {
+		const el = document.createElement('div');
+		el.className = 'thumbnail-cluster';
+		el.style.width = '40px';
+		el.style.height = '40px';
+		el.style.borderRadius = '50%';
+		el.style.background = '#d00';
+		el.style.border = '2px solid white';
+		el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+		el.style.display = 'flex';
+		el.style.alignItems = 'center';
+		el.style.justifyContent = 'center';
+		el.style.color = 'white';
+		el.style.fontWeight = '600';
+		el.style.fontSize = '12px';
+		el.style.cursor = 'pointer';
+		el.textContent = count.toString();
+
+		el.addEventListener('click', (e) => {
+			e.stopPropagation();
+			// Zoom in enough to separate the thumbnails (reduce cluster count by at least 1)
+			const currentZoom = map.getZoom();
+			// Increase zoom by 2.5 to ensure cluster splits
+			map.flyTo({ center: centerCoords, zoom: currentZoom + 2.5, duration: 1000, essential: true });
+		});
+
+		return new maplibregl.Marker({ element: el, anchor: 'center' });
 	}
 
 	function createDOMMarker(place: any) {
 		const el = document.createElement('div');
-		el.className = 'marker-card';
-		el.style.width = '170px';
-		el.style.height = '110px';
-		el.style.position = 'relative';
-		el.style.borderRadius = '8px';
+		el.className = 'marker-thumbnail';
+		el.style.width = '100px';
+		el.style.height = '100px';
+		el.style.borderRadius = '50%';
 		el.style.overflow = 'hidden';
-		el.style.boxShadow = '0 4px 10px rgba(0,0,0,0.25)';
-		el.style.border = '1px solid rgba(0,0,0,0.15)';
+		el.style.boxShadow = '0 3px 8px rgba(0,0,0,0.3)';
+		el.style.border = '2px solid white';
+		el.style.backgroundColor = '#ddd';
 		el.style.cursor = 'pointer';
 
 		const img = document.createElement('img');
@@ -246,27 +283,23 @@
 		img.style.objectFit = 'cover';
 		el.appendChild(img);
 
-		const title = document.createElement('div');
-		title.className = 'marker-title';
-		title.textContent = place.name;
-		title.style.position = 'absolute';
-		title.style.left = '0';
-		title.style.right = '0';
-		title.style.bottom = '0';
-		title.style.padding = '6px 8px';
-		title.style.background = 'linear-gradient( to top, rgba(0,0,0,0.55), rgba(0,0,0,0.15) )';
-		title.style.color = '#fff';
-		title.style.fontSize = '13px';
-		title.style.fontWeight = '600';
-		title.style.textShadow = '0 1px 2px rgba(0,0,0,0.6)';
-		el.appendChild(title);
-
 		el.addEventListener('click', (e) => {
 			e.stopPropagation();
-			selectedPlace = place;
+			const currentZoom = map.getZoom();
+			const coords = place?.point?.coordinates as [number, number] | undefined;
+			
+			if (coords && currentZoom < THUMBNAIL_ZOOM - 0.5) {
+				// If not zoomed in enough, zoom first then open modal
+				zoomToThumbnail(coords, () => {
+					selectedPlace = place;
+				});
+			} else {
+				// Already zoomed in, open the modal immediately
+				selectedPlace = place;
+			}
 		});
 
-		return new maplibregl.Marker({ element: el, anchor: 'bottom' });
+		return new maplibregl.Marker({ element: el, anchor: 'center' });
 	}
 
 	function closeStory() {
@@ -317,6 +350,8 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 </svelte:head>
 
+<a href="/list" class="list-btn">Listen Ansicht</a>
+
 <div class="map-container" bind:this={mapContainer}></div>
 
 {#if selectedPlace}
@@ -349,6 +384,27 @@
 	.map-container {
 		width: 100vw;
 		height: 100vh;
+	}
+
+	.list-btn {
+		position: fixed;
+		top: 1rem;
+		left: 1rem;
+		z-index: 10;
+		padding: 0.75rem 1.25rem;
+		background: white;
+		color: #333;
+		text-decoration: none;
+		border-radius: 4px;
+		font-weight: 600;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+		transition: background 0.2s, transform 0.2s;
+		font-size: 0.95rem;
+	}
+
+	.list-btn:hover {
+		background: #f5f5f5;
+		transform: translateY(-2px);
 	}
 
 	.modal-backdrop {

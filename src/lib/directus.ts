@@ -18,12 +18,27 @@ interface Schema {
 	place: Place[];
 }
 
-let apiUrl = PUBLIC_DIRECTUS_URL;
-if (typeof window !== 'undefined' && apiUrl.startsWith('/')) {
-	apiUrl = new URL(apiUrl, window.location.origin).href;
-}
+export const createDirectusClient = (fetchFn?: typeof fetch) => {
+	let apiUrl = PUBLIC_DIRECTUS_URL;
+	if (typeof window !== 'undefined' && apiUrl.startsWith('/')) {
+		apiUrl = new URL(apiUrl, window.location.origin).href;
+	}
+	
+	const client = createDirectus<Schema>(apiUrl).with(
+		rest({
+			onRequest: (options) => {
+				if (fetchFn) {
+					return { ...options, fetch: fetchFn };
+				}
+				return options;
+			}
+		})
+	);
+	
+	return client;
+};
 
-export const directus = createDirectus<Schema>(apiUrl).with(rest());
+export const directus = createDirectusClient();
 
 export const getImageUrl = (fileId: string, transformKey?: string) => {
 	let url = `${PUBLIC_DIRECTUS_URL}/assets/${fileId}`;

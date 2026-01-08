@@ -1,0 +1,3 @@
+- Implement comment section under stories
+    - create collection "comments" with relational field to story
+    - columns: comment, date, published
