@@ -526,7 +526,7 @@
 
 	.modal-content {
 		background: #f0eded;
-		padding: 2rem;
+		padding: 1rem;
 		border-radius: 8px;
 		width: 90%;
 		max-width: 800px;
@@ -534,6 +534,8 @@
 		overflow-y: auto;
 		position: relative;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		margin-left: 10px;
+		margin-right: 10px;
 	}
 
 	.close-btn {
@@ -574,5 +576,11 @@
 		max-width: 100%;
 		height: auto;
 		border-radius: 4px;
+	}
+
+	@media (min-width: 1000px) {
+		.modal-content {
+			padding: 2rem;
+		}
 	}
 </style>

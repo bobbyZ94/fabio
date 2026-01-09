@@ -51,7 +51,7 @@
 <div class="container">
 	<header>
 		<h1>Baukulturerbe</h1>
-		<a href="/" class="back-btn">← Zur Karte</a>
+		<a href="/" class="back-btn"><span class="arrow">←</span></a>
 	</header>
 
 	<div class="places-grid">
@@ -118,17 +118,30 @@
 	}
 
 	.back-btn {
-		padding: 0.75rem 1.5rem;
+		padding: 5px;
 		background: #333;
 		color: white;
 		text-decoration: none;
 		border-radius: 4px;
 		font-weight: 600;
 		transition: background 0.2s;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+		height: 30px;
+		width: 40px;
 	}
 
 	.back-btn:hover {
 		background: #555;
+	}
+
+	.back-btn .arrow {
+		font-size: 2rem;
+		line-height: 0;
+		display: block;
+		margin-top: -2px;
 	}
 
 	.places-grid {
@@ -196,7 +209,7 @@
 
 	.modal-content {
 		background: #f0eded;
-		padding: 2rem;
+		padding: 1rem;
 		border-radius: 8px;
 		width: 90%;
 		max-width: 800px;
@@ -243,5 +256,11 @@
 		max-width: 100%;
 		height: auto;
 		border-radius: 4px;
+	}
+
+	@media (min-width: 1000px) {
+		.modal-content {
+			padding: 2rem;
+		}
 	}
 </style>
