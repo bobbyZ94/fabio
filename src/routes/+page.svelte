@@ -206,7 +206,7 @@
 	function zoomToThumbnail(coords: [number, number], onComplete?: () => void) {
 		if (!map) return;
 		const zoomTarget = Math.min(map.getMaxZoom(), MAP_CONFIG.thumbnailZoom);
-		map.flyTo({ center: coords, zoom: zoomTarget, duration: 2000, essential: true });
+		map.flyTo({ center: coords, zoom: zoomTarget, duration: 1500, essential: true });
 		if (onComplete) {
 			map.once('moveend', onComplete);
 		}
@@ -374,7 +374,7 @@
 				map.flyTo({
 					center: centerCoords,
 					zoom: currentZoom + MAP_CONFIG.clustering.zoomIncrement,
-					duration: 2000,
+					duration: 1500,
 				});
 				return;
 			}
@@ -382,7 +382,7 @@
 			map.fitBounds(bounds, {
 				padding: 100,
 				maxZoom: MAP_CONFIG.maxZoom,
-				duration: 2000,
+				duration: 1500,
 			});
 		});
 
