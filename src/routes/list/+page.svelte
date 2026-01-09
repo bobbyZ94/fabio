@@ -89,17 +89,21 @@
 {/if}
 
 <style>
+	:global(html),
 	:global(body) {
 		margin: 0;
 		padding: 0;
 		font-family: 'Titillium Web', sans-serif;
 		background: #f5f5f5;
+		height: auto;
+		overflow-y: visible;
 	}
 
 	.container {
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 2rem;
+		min-height: 100vh;
 	}
 
 	header {
