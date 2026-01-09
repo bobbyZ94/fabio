@@ -93,7 +93,7 @@
 	:global(body) {
 		margin: 0;
 		padding: 0;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 		background: #f5f5f5;
 		height: 100%;
 		overflow-y: auto;
@@ -205,6 +205,7 @@
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.date {
@@ -252,7 +253,7 @@
 		margin-bottom: 1rem;
 		border-bottom: 1px solid #000000;
 		padding-bottom: 0.5rem;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.story-header h2 {
@@ -267,7 +268,7 @@
 
 	.story-body {
 		line-height: 1.6;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.story-body :global(img) {

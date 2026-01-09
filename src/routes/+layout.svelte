@@ -1,5 +1,5 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/favicon.ico';
 
 	let { children } = $props();
 </script>
@@ -12,6 +12,6 @@
 
 <style>
 	:global(body) {
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 </style>

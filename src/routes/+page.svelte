@@ -100,6 +100,8 @@
 			transform: 'translateY(-15px)',
 			padding: '3px 4px',
 			lineHeight: '1.2',
+			wordBreak: 'break-word',
+			fontFamily: 'Roboto, system-ui, sans-serif'
 		},
 		wrapper: {
 			display: 'flex',
@@ -509,7 +511,7 @@
 		margin: 0;
 		padding: 0;
 		overflow: hidden;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.map-container {
@@ -538,7 +540,7 @@
 		transition: background 0.2s, transform 0.2s;
 		font-size: 0.95rem;
 		cursor: pointer;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.list-btn:hover, .intro-btn:hover {
@@ -588,7 +590,7 @@
 		margin-bottom: 1rem;
 		border-bottom: 1px solid #000000;
 		padding-bottom: 0.5rem;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	.story-header h2 {
@@ -603,7 +605,7 @@
 
 	.story-body {
 		line-height: 1.6;
-		font-family: 'Titillium Web', sans-serif;
+		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
 	/* Wysiwyg content styles */
