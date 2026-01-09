@@ -157,10 +157,9 @@
 	.place-card {
 		background: white;
 		border: 1px solid #ddd;
-		border-radius: 8px;
 		overflow: hidden;
+		border-radius: 8px;
 		cursor: pointer;
-		transition: transform 0.2s, box-shadow 0.2s;
 		text-align: left;
 		padding: 0;
 		width: 100%;
@@ -173,8 +172,7 @@
 
 	.place-image {
 		width: 100%;
-		height: 200px;
-		overflow: hidden;
+		height: 280px;
 	}
 
 	.place-image img {
@@ -185,12 +183,23 @@
 
 	.place-info {
 		padding: 1rem;
+		height: 80px;
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
 	}
 
 	.place-info h2 {
 		margin: 0 0 0.5rem 0;
 		font-size: 1.25rem;
 		color: #333;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		line-height: 1.4;
 	}
 
 	.date {
