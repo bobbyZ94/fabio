@@ -93,13 +93,13 @@
 			color: '#000000',
 			fontSize: '11px',
 			fontWeight: '600',
-			padding: '4px 6px',
 			boxSizing: 'border-box',
 			textAlign: 'center',
 			maxWidth: '120px',
 			borderRadius: '6px',
-			transform: 'translateY(-25px)',
-			margin: '10px'
+			transform: 'translateY(-15px)',
+			padding: '3px 4px',
+			lineHeight: '1.2',
 		},
 		wrapper: {
 			display: 'flex',
@@ -114,6 +114,7 @@
 	let showIntroModal: boolean = $state(false);
 	let markers: maplibregl.Marker[] = [];
 	let placeById: Record<number, Place> = {};
+	let markerUpdateScheduled = false;
 
 	onMount(() => {
 		map = new maplibregl.Map({
@@ -174,7 +175,19 @@
 
 			// Render card markers with custom clustering
 			updateMarkers();
-			map.on('moveend', updateMarkers);
+
+			// Update markers continuously while the map is moving/zooming,
+			// so clusters can split/merge during flyTo/fitBounds animations.
+			const scheduleMarkerUpdate = () => {
+				if (markerUpdateScheduled) return;
+				markerUpdateScheduled = true;
+				requestAnimationFrame(() => {
+					markerUpdateScheduled = false;
+					updateMarkers();
+				});
+			};
+
+			map.on('move', scheduleMarkerUpdate);
 			map.on('zoomend', updateMarkers);
 		});
 
@@ -344,9 +357,31 @@
 
 		el.addEventListener('click', (e) => {
 			e.stopPropagation();
-			// Zoom in enough to separate the thumbnails (reduce cluster count by at least 1)
-			const currentZoom = map.getZoom();
-			map.flyTo({ center: centerCoords, zoom: currentZoom + MAP_CONFIG.clustering.zoomIncrement, duration: 2000, essential: true });
+			// Zoom to a bounds that contains all places in this cluster
+			const bounds = new maplibregl.LngLatBounds();
+
+			for (const place of places) {
+				if (place.point?.coordinates) {
+					bounds.extend(place.point.coordinates as [number, number]);
+				}
+			}
+
+			// Fallback to simple zoom-in if we somehow have no valid bounds
+			if (bounds.isEmpty()) {
+				const currentZoom = map.getZoom();
+				map.flyTo({
+					center: centerCoords,
+					zoom: currentZoom + MAP_CONFIG.clustering.zoomIncrement,
+					duration: 2000,
+				});
+				return;
+			}
+
+			map.fitBounds(bounds, {
+				padding: 100,
+				maxZoom: MAP_CONFIG.maxZoom,
+				duration: 2000,
+			});
 		});
 
 		return new maplibregl.Marker({ element: el, anchor: 'center' });
