@@ -95,14 +95,18 @@
 		padding: 0;
 		font-family: 'Titillium Web', sans-serif;
 		background: #f5f5f5;
-		height: auto;
-		overflow-y: visible;
+		height: 100%;
+		overflow-y: auto;
+	}
+
+	:global(#svelte) {
+		height: 100%;
 	}
 
 	.container {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 2rem;
+		padding: 1rem;
 		min-height: 100vh;
 	}
 
@@ -149,21 +153,24 @@
 	}
 
 	.places-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: 1.5rem;
-	}
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 180px));
+        gap: 1rem;
+        justify-content: center;
+		width: 100%
+    }
 
 	.place-card {
-		background: white;
-		border: 1px solid #ddd;
-		overflow: hidden;
-		border-radius: 8px;
-		cursor: pointer;
-		text-align: left;
-		padding: 0;
-		width: 100%;
-	}
+        background: white;
+        border: 1px solid #ddd;
+        overflow: hidden;
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: left;
+        padding: 0;
+        display: grid;
+        grid-template-rows: 200px auto;
+    }
 
 	.place-card:hover {
 		transform: translateY(-4px);
@@ -172,7 +179,7 @@
 
 	.place-image {
 		width: 100%;
-		height: 280px;
+		height: 200px;
 	}
 
 	.place-image img {
@@ -182,24 +189,22 @@
 	}
 
 	.place-info {
-		padding: 1rem;
-		height: 80px;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
+		padding: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
 	}
 
 	.place-info h2 {
 		margin: 0 0 0.5rem 0;
-		font-size: 1.25rem;
+		font-size: 1rem;
 		color: #333;
 		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		line-height: 1.4;
 	}
 
 	.date {
@@ -276,4 +281,5 @@
 			padding: 2rem;
 		}
 	}
+
 </style>
