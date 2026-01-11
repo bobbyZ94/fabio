@@ -360,29 +360,47 @@
 
 		el.addEventListener('click', (e) => {
 			e.stopPropagation();
-			// Zoom to a bounds that contains all places in this cluster
-			const bounds = new maplibregl.LngLatBounds();
-
-			for (const place of places) {
-				if (place.point?.coordinates) {
-					bounds.extend(place.point.coordinates as [number, number]);
+			
+			// Calculate the optimal zoom level where this cluster will split
+			// Find the two furthest points to determine minimum zoom needed
+			let maxDistance = 0;
+			const coords = places.map(p => p.point.coordinates);
+			
+			for (let i = 0; i < coords.length; i++) {
+				for (let j = i + 1; j < coords.length; j++) {
+					const lngDiff = coords[i][0] - coords[j][0];
+					const latDiff = coords[i][1] - coords[j][1];
+					const distance = Math.sqrt(lngDiff * lngDiff + latDiff * latDiff);
+					maxDistance = Math.max(maxDistance, distance);
 				}
 			}
-
-			// Fallback to simple zoom-in if we somehow have no valid bounds
-			if (bounds.isEmpty()) {
-				const currentZoom = map.getZoom();
-				map.flyTo({
-					center: centerCoords,
-					zoom: currentZoom + MAP_CONFIG.clustering.zoomIncrement,
-					duration: 1500,
-				});
-				return;
+			
+			// Calculate zoom level where the furthest points would be just over the threshold
+			// Use binary search to find the right zoom level
+			let testZoom = map.getZoom();
+			let zoomIncrement = 1;
+			
+			// Try increasing zoom levels until the cluster would split
+			for (let attempt = 0; attempt < 10; attempt++) {
+				testZoom += zoomIncrement;
+				if (testZoom > MAP_CONFIG.maxZoom) {
+					testZoom = MAP_CONFIG.maxZoom;
+					break;
+				}
+				
+				// Project coordinates at this zoom level to check pixel distance
+				const metersPerPixel = 156543.03392 * Math.cos(centerCoords[1] * Math.PI / 180) / Math.pow(2, testZoom);
+				const pixelDistance = (maxDistance * 111320) / metersPerPixel; // 111320 meters per degree
+				
+				if (pixelDistance > MAP_CONFIG.clustering.overlapThreshold * 1.2) {
+					// Found a zoom level where cluster will split
+					break;
+				}
 			}
-
-			map.fitBounds(bounds, {
-				padding: 100,
-				maxZoom: MAP_CONFIG.maxZoom,
+			
+			map.flyTo({
+				center: centerCoords,
+				zoom: Math.min(testZoom, MAP_CONFIG.maxZoom),
 				duration: 1500,
 			});
 		});
@@ -422,28 +440,28 @@
 		wrapper.appendChild(el);
 		wrapper.appendChild(title);
 
-		wrapper.addEventListener('click', (e) => {
-			e.stopPropagation();
-			const currentZoom = map.getZoom();
-			const coords = place.point.coordinates;
-			
-			if (coords && currentZoom < MAP_CONFIG.thumbnailZoom - 0.5) {
-				// If not zoomed in enough, zoom first then open modal
-				zoomToThumbnail(coords, () => {
-					selectedPlace = place;
-				});
-			} else {
-				// Already zoomed in, open the modal immediately
+	wrapper.addEventListener('click', (e) => {
+		e.stopPropagation();
+		const currentZoom = map.getZoom();
+		const coords = place.point.coordinates;
+		
+		if (coords && currentZoom < MAP_CONFIG.thumbnailZoom - 0.5) {
+			// If not zoomed in enough, zoom first then open modal
+			zoomToThumbnail(coords, () => {
 				selectedPlace = place;
-			}
-		});
+			});
+		} else {
+			// Already zoomed in, open the modal immediately
+			selectedPlace = place;
+		}
+	});
 
-		return new maplibregl.Marker({ element: wrapper, anchor: 'center' });
-	}
+	return new maplibregl.Marker({ element: wrapper, anchor: 'center' });
+}
 
-	function closeStory() {
-		selectedPlace = null;
-	}
+function closeStory() {
+	selectedPlace = null;
+}
 </script>
 
 <svelte:head>
