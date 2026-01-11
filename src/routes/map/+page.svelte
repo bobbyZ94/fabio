@@ -121,11 +121,30 @@
 	let markerUpdateScheduled = false;
 
 	onMount(() => {
+		// Check for URL parameters to set initial position
+		const lat = $page.url.searchParams.get('lat');
+		const lng = $page.url.searchParams.get('lng');
+		const zoom = $page.url.searchParams.get('zoom');
+		
+		let initialCenter = MAP_CONFIG.center;
+		let initialZoom = MAP_CONFIG.zoom;
+		
+		if (lat && lng) {
+			const targetLat = parseFloat(lat);
+			const targetLng = parseFloat(lng);
+			const targetZoom = zoom ? parseFloat(zoom) : MAP_CONFIG.thumbnailZoom;
+			
+			if (!isNaN(targetLat) && !isNaN(targetLng)) {
+				initialCenter = [targetLng, targetLat];
+				initialZoom = targetZoom;
+			}
+		}
+
 		map = new maplibregl.Map({
 			container: mapContainer,
 			style: MAP_CONFIG.style,
-			center: MAP_CONFIG.center,
-			zoom: MAP_CONFIG.zoom,
+			center: initialCenter,
+			zoom: initialZoom,
 			maxZoom: MAP_CONFIG.maxZoom,
 			minZoom: MAP_CONFIG.minZoom,
 			attributionControl: false
@@ -199,29 +218,6 @@
 		map.on('error', (e: maplibregl.ErrorEvent) => {
 			console.error('MapLibre error:', e.error);
 		});
-
-		// Check for URL parameters to fly to specific location
-		const lat = $page.url.searchParams.get('lat');
-		const lng = $page.url.searchParams.get('lng');
-		const zoom = $page.url.searchParams.get('zoom');
-		
-		if (lat && lng) {
-			const targetLat = parseFloat(lat);
-			const targetLng = parseFloat(lng);
-			const targetZoom = zoom ? parseFloat(zoom) : MAP_CONFIG.thumbnailZoom;
-			
-			if (!isNaN(targetLat) && !isNaN(targetLng)) {
-				map.once('load', () => {
-					setTimeout(() => {
-						map.flyTo({ 
-							center: [targetLng, targetLat], 
-							zoom: targetZoom, 
-							duration: 1500 
-						});
-					}, 100);
-				});
-			}
-		}
 
 		return () => {
 			map.remove();

@@ -15,10 +15,9 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="modal-backdrop" onclick={onclose}>
 		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<button class="close-btn" onclick={onclose}>&times;</button>
-			
 			<div class="story-header">
 				<h2>Wer bin ich?</h2>
+				<button class="close-btn" onclick={onclose}>&times;</button>
 			</div>
 			
 			<div class="story-body">
@@ -61,14 +60,14 @@
 	}
 
 	.close-btn {
-		position: absolute;
-		top: 10px;
-		right: 15px;
 		background: none;
 		border: none;
 		font-size: 2rem;
 		cursor: pointer;
 		color: #333;
+		line-height: 1;
+		padding: 0;
+		margin: 0;
 	}
 
 	.story-header {
@@ -76,10 +75,13 @@
 		border-bottom: 1px solid #000000;
 		padding-bottom: 0.5rem;
 		font-family: 'Roboto', system-ui, sans-serif;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 	}
 
 	.story-header h2 {
-		margin-bottom: 10px;
+		margin: 0;
 		font-size: 1.8rem;
 	}
 
