@@ -2,6 +2,7 @@
     import { MoveLeft, MapPinned } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { optimizeContent } from '$lib/contentUtils';
+	import { getImageUrl } from '$lib/directus';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -19,6 +20,7 @@
 </svelte:head>
 
 <div class="page-container">
+	<div class="background-image" style="background-image: url('{getImageUrl(data.place.thumbnail, 'page-bg')}');"></div>
 	<div class="button-bar">
 		<button class="back-button" onclick={() => window.history.back()}><MoveLeft /></button>
 		<button class="map-button" onclick={navigateToMap}><MapPinned /></button>
@@ -48,12 +50,29 @@
 		margin: 0 auto;
 		padding: 2rem 1rem;
 		min-height: 100vh;
+		position: relative;
+	}
+
+	.background-image {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		opacity: 0.2;
+		filter: grayscale(100%);
+		z-index: -1;
 	}
 
 	.button-bar {
 		display: flex;
 		justify-content: space-between;
 		margin-bottom: 2rem;
+		position: relative;
+		z-index: 1;
 	}
 
 	.back-button, .map-button {
@@ -89,6 +108,8 @@
 		border-radius: 8px;
 		padding: 2rem;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		position: relative;
+		z-index: 1;
 	}
 
 	.place-header {
