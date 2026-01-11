@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { getImageUrl } from '$lib/directus';
-	import { optimizeContent } from '$lib/contentUtils';
+	import { generateSlug } from '$lib/contentUtils';
 	import IntroModal from '$lib/components/IntroModal.svelte';
 	import type { PageData } from './$types';
 
@@ -113,7 +115,6 @@
 
 	let mapContainer: HTMLDivElement;
 	let map: maplibregl.Map;
-	let selectedPlace: Place | null = $state(null);
 	let showIntroModal: boolean = $state(false);
 	let markers: maplibregl.Marker[] = [];
 	let placeById: Record<number, Place> = {};
@@ -198,6 +199,29 @@
 		map.on('error', (e: maplibregl.ErrorEvent) => {
 			console.error('MapLibre error:', e.error);
 		});
+
+		// Check for URL parameters to fly to specific location
+		const lat = $page.url.searchParams.get('lat');
+		const lng = $page.url.searchParams.get('lng');
+		const zoom = $page.url.searchParams.get('zoom');
+		
+		if (lat && lng) {
+			const targetLat = parseFloat(lat);
+			const targetLng = parseFloat(lng);
+			const targetZoom = zoom ? parseFloat(zoom) : MAP_CONFIG.thumbnailZoom;
+			
+			if (!isNaN(targetLat) && !isNaN(targetLng)) {
+				map.once('load', () => {
+					setTimeout(() => {
+						map.flyTo({ 
+							center: [targetLng, targetLat], 
+							zoom: targetZoom, 
+							duration: 1500 
+						});
+					}, 100);
+				});
+			}
+		}
 
 		return () => {
 			map.remove();
@@ -446,21 +470,17 @@
 		const coords = place.point.coordinates;
 		
 		if (coords && currentZoom < MAP_CONFIG.thumbnailZoom - 0.5) {
-			// If not zoomed in enough, zoom first then open modal
+			// If not zoomed in enough, zoom first then navigate
 			zoomToThumbnail(coords, () => {
-				selectedPlace = place;
+				goto(`/place/${generateSlug(place.name)}`);
 			});
 		} else {
-			// Already zoomed in, open the modal immediately
-			selectedPlace = place;
+			// Already zoomed in, navigate immediately
+			goto(`/place/${generateSlug(place.name)}`);
 		}
 	});
 
 	return new maplibregl.Marker({ element: wrapper, anchor: 'center' });
-}
-
-function closeStory() {
-	selectedPlace = null;
 }
 </script>
 
@@ -477,36 +497,15 @@ function closeStory() {
 
 <div class="map-container" bind:this={mapContainer}></div>
 
-{#if selectedPlace}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-backdrop" onclick={closeStory}>
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<button class="close-btn" onclick={closeStory}>&times;</button>
-			<div class="story-header">
-				<h2>{selectedPlace.name}</h2>
-				<span class="date">{new Date(selectedPlace.date).toLocaleDateString()}</span>
-			</div>
-			<div class="story-body">
-				{@html optimizeContent(selectedPlace.story)}
-			</div>
-		</div>
-	</div>
-{/if}
-
 <IntroModal introduction={data.introduction} open={showIntroModal} onclose={() => showIntroModal = false} />
 
 <style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		overflow: hidden;
-		font-family: 'Roboto', system-ui, sans-serif;
-	}
-
 	.map-container {
 		width: 100vw;
 		height: 100vh;
+		position: fixed;
+		top: 0;
+		left: 0;
 	}
 
 	.top-buttons {
@@ -556,79 +555,6 @@ function closeStory() {
 	.intro-btn:hover {
 		background: #f5f5f5;
 		transform: translateY(-2px);
-	}
-
-	.modal-backdrop {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background: rgba(0, 0, 0, 0.8);
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		z-index: 1000;
-	}
-
-	.modal-content {
-		background: #f0eded;
-		padding: 1rem;
-		border-radius: 8px;
-		width: 90%;
-		max-width: 800px;
-		max-height: 80vh;
-		overflow-y: auto;
-		position: relative;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-		margin-left: 10px;
-		margin-right: 10px;
-	}
-
-	.close-btn {
-		position: absolute;
-		top: 10px;
-		right: 15px;
-		background: none;
-		border: none;
-		font-size: 2rem;
-		cursor: pointer;
-		color: #333;
-	}
-
-	.story-header {
-		margin-bottom: 1rem;
-		border-bottom: 1px solid #000000;
-		padding-bottom: 0.5rem;
-		font-family: 'Roboto', system-ui, sans-serif;
-	}
-
-	.story-header h2 {
-		margin-bottom: 10px;
-		font-size: 1.8rem;
-	}
-
-	.date {
-		color: #666;
-		font-size: 1rem;
-	}
-
-	.story-body {
-		line-height: 1.6;
-		font-family: 'Roboto', system-ui, sans-serif;
-	}
-
-	/* Wysiwyg content styles */
-	.story-body :global(img) {
-		max-width: 100%;
-		height: auto;
-		border-radius: 4px;
-	}
-
-	@media (min-width: 1000px) {
-		.modal-content {
-			padding: 2rem;
-		}
 	}
 </style>
 

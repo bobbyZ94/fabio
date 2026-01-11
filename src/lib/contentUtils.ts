@@ -55,6 +55,36 @@ export function optimizeImageUrl(
 }
 
 /**
+ * Generates a URL-friendly slug from a string.
+ * Converts to lowercase, removes special characters, and replaces spaces with hyphens.
+ * 
+ * @param text - The text to convert to a slug
+ * @returns URL-safe slug
+ */
+export function generateSlug(text: string): string {
+	if (!text) return '';
+	
+	return text
+		.toLowerCase()
+		.trim()
+		// Replace umlauts and special characters
+		.replace(/ä/g, 'ae')
+		.replace(/ö/g, 'oe')
+		.replace(/ü/g, 'ue')
+		.replace(/ß/g, 'ss')
+		// Remove apostrophes and quotes
+		.replace(/['''"""]/g, '')
+		// Replace spaces and underscores with hyphens
+		.replace(/[\s_]+/g, '-')
+		// Remove any remaining non-alphanumeric characters except hyphens
+		.replace(/[^a-z0-9-]/g, '')
+		// Replace multiple consecutive hyphens with a single hyphen
+		.replace(/-+/g, '-')
+		// Remove leading and trailing hyphens
+		.replace(/^-+|-+$/g, '');
+}
+
+/**
  * Processes HTML content to optimize image URLs.
  * Finds all src attributes pointing to /assets/ and optimizes them.
  * 
