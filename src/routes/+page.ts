@@ -14,7 +14,8 @@ export const load: PageLoad = async ({ fetch }) => {
 						_eq: 'published'
 					}
 				},
-				fields: ['*'] // Fetch all fields including thumbnail, story, etc.
+				fields: ['*'],
+				sort: ['-date'] // Sort by date descending (newest first)
 			})
 		);
 
@@ -30,10 +31,12 @@ export const load: PageLoad = async ({ fetch }) => {
 			introduction: Array.isArray(introduction) && introduction.length > 0 ? introduction[0] : introduction
 		};
 	} catch (error) {
-		console.error('Error fetching data:', error);
+		console.error('Error fetching places:', error);
 		return {
 			places: [],
 			introduction: null
 		};
 	}
 };
+
+
