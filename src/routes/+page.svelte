@@ -158,4 +158,18 @@
 		color: #666;
 		font-size: 0.9rem;	
 	}
+
+	@media (max-width: 768px) {
+		h1 {
+			font-size: 1.5rem;
+		}
+	}
+	@media (max-width: 410px) {
+		h1 {
+			font-size: 1.25rem;
+		}
+		.places-grid {
+			grid-template-columns: repeat(auto-fill, minmax(150px, 150px));
+		}
+	}
 </style>
