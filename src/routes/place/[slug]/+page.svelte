@@ -153,8 +153,9 @@
 	}
 
 	.place-content :global(img) {
-		max-width: 100%;
+		width: 100%;
 		height: auto;
+		display: block;
 		border-radius: 4px;
 		margin: 1.5rem 0;
 	}
