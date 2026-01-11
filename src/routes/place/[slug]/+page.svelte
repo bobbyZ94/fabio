@@ -28,7 +28,10 @@
 	<article class="place-article">
 		<header class="place-header">
 			<h1>{data.place.name}</h1>
-			<time class="date">{new Date(data.place.date).toLocaleDateString('de-DE')}</time>
+			<div class="meta">
+				<time class="date">{new Date(data.place.date).toLocaleDateString('de-DE')}</time>
+				<span class="rating">⭐{data.place.rating}/10</span>
+			</div>
 		</header>
 
 		<div class="place-content">
@@ -124,7 +127,20 @@
 		font-weight: 700;
 	}
 
+	.meta {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+	}
+
 	.date {
+		color: #666;
+		font-size: 1rem;
+		font-weight: 500;
+	}
+
+	.rating {
 		color: #666;
 		font-size: 1rem;
 		font-weight: 500;

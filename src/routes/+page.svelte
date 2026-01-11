@@ -30,7 +30,10 @@
 				</div>
 				<div class="place-info">
 					<h2>{place.name}</h2>
-					<span class="date">{new Date(place.date).toLocaleDateString()}</span>
+					<div class="meta">
+						<span class="date">{new Date(place.date).toLocaleDateString()}</span>
+						<span class="rating">⭐{place.rating}/10</span>
+					</div>
 				</div>
 			</a>
 		{/each}
@@ -97,7 +100,7 @@
 
 	.places-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 180px));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 250px));
         gap: 1rem;
         justify-content: center;
 		width: 100%;
@@ -154,11 +157,28 @@
 		font-family: 'Roboto', system-ui, sans-serif;
 	}
 
+	.meta {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
 	.date {
 		color: #666;
 		font-size: 0.9rem;	
 	}
 
+	.rating {
+		color: #666;
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+	@media (max-width: 1000px) {
+		.places-grid {
+			grid-template-columns: repeat(auto-fill, minmax(180px, 180px));
+		}
+	}
 	@media (max-width: 768px) {
 		h1 {
 			font-size: 1.5rem;

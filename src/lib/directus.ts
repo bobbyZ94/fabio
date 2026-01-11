@@ -12,6 +12,7 @@ interface Place {
 	};
 	thumbnail: string; // UUID of the file
 	story: string;
+	rating: number;
 }
 
 interface Schema {
