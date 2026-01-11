@@ -64,7 +64,6 @@
 		background-repeat: no-repeat;
 		opacity: 0.2;
 		filter: grayscale(100%);
-		z-index: -1;
 	}
 
 	.button-bar {

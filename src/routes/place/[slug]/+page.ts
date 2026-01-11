@@ -4,8 +4,6 @@ import { generateSlug } from '$lib/contentUtils';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const ssr = false;
-
 export const load: PageLoad = async ({ params, fetch }) => {
 	try {
 		const directus = createDirectusClient(fetch);
